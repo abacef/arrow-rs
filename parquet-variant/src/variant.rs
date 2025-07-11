@@ -1138,6 +1138,107 @@ impl TryFrom<(i128, u8)> for Variant<'_, '_> {
     }
 }
 
+pub trait PrimitiveCheck {
+    fn is_primitive() -> bool;
+}
+
+impl PrimitiveCheck for () {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for bool {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for i8 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for i16 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for i32 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for i64 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for VariantDecimal4 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for VariantDecimal8 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for VariantDecimal16 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for f32 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for f64 {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for NaiveDate {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for DateTime<Utc> {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for NaiveDateTime {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for &[u8] {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+impl PrimitiveCheck for &str {
+    fn is_primitive() -> bool {
+        true
+    }
+}
+
+impl PrimitiveCheck for VariantList<'_, '_> {
+    fn is_primitive() -> bool {
+        false
+    }
+}
+impl PrimitiveCheck for VariantObject<'_, '_> {
+    fn is_primitive() -> bool {
+        false
+    }
+}
+impl PrimitiveCheck for Variant<'_, '_> {
+    fn is_primitive() -> bool {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

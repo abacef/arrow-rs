@@ -15,7 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 use crate::decoder::{VariantBasicType, VariantPrimitiveType};
-use crate::{ShortString, Variant, VariantDecimal16, VariantDecimal4, VariantDecimal8};
+use crate::{
+    PrimitiveCheck, ShortString, Variant, VariantDecimal16, VariantDecimal4, VariantDecimal8,
+};
 use arrow_schema::ArrowError;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
@@ -706,8 +708,32 @@ impl VariantBuilder {
     /// // most primitive types can be appended directly as they implement `Into<Variant>`
     /// builder.append_value(42i8);
     /// ```
-    pub fn append_value<'m, 'd, T: Into<Variant<'m, 'd>>>(&mut self, value: T) {
-        self.buffer.append_non_nested_value(value);
+    pub fn append_value<'m, 'd, T: Into<Variant<'m, 'd>> + PrimitiveCheck>(&mut self, value: T) {
+        let is_primitive = T::is_primitive();
+        if is_primitive {
+            self.buffer.append_non_nested_value(value);
+        } else {
+            let variant = value.into();
+            match variant {
+                Variant::Object(o) => {
+                    let mut no = self.new_object();
+                    for (key, val) in o.iter() {
+                        no.insert(key, val);
+                    }
+                    no.finish().unwrap()
+                }
+                Variant::List(l) => {
+                    let mut nl = self.new_list();
+                    for item in l.iter() {
+                        nl.append_value(item);
+                    }
+                    nl.finish()
+                }
+                _ => {
+                    self.buffer.append_non_nested_value(variant);
+                }
+            }
+        }
     }
 
     /// Finish the builder and return the metadata and value buffers.
@@ -953,7 +979,7 @@ impl Drop for ObjectBuilder<'_> {
 /// Allows users to append values to a [`VariantBuilder`], [`ListBuilder`] or
 /// [`ObjectBuilder`]. using the same interface.
 pub trait VariantBuilderExt<'m, 'v> {
-    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>>);
+    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>> + PrimitiveCheck);
 
     fn new_list(&mut self) -> ListBuilder;
 
@@ -975,7 +1001,7 @@ impl<'m, 'v> VariantBuilderExt<'m, 'v> for ListBuilder<'_> {
 }
 
 impl<'m, 'v> VariantBuilderExt<'m, 'v> for VariantBuilder {
-    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>>) {
+    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>> + PrimitiveCheck) {
         self.append_value(value);
     }
 
@@ -1605,7 +1631,7 @@ mod tests {
 
         let (metadata, value) = builder.finish();
 
-        // note, object fields are now sorted lexigraphically by field name
+        // note, object fields are now sorted lexicographically by field name
         /*
          {
             "a": false,
@@ -1857,6 +1883,43 @@ mod tests {
         let metadata = MetadataBuilder::from_iter(Vec::<&str>::new());
         assert_eq!(metadata.num_field_names(), 0);
         assert!(!metadata.is_sorted);
+    }
+
+    #[test]
+    fn test_append_object() {
+        let (m1, v1) = make_object();
+        let variant = Variant::new(&m1, &v1);
+        let mut builder = VariantBuilder::new();
+        builder.append_value(variant.clone());
+        let (metadata, value) = builder.finish();
+        assert_eq!(variant, Variant::new(&metadata, &value));
+    }
+
+    fn make_object() -> (Vec<u8>, Vec<u8>) {
+        let mut builder = VariantBuilder::new();
+        let mut obj = builder.new_object();
+        obj.insert("a", true);
+        obj.finish().unwrap();
+        builder.finish()
+    }
+
+    #[test]
+    fn test_append_list() {
+        let (m1, v1) = make_list();
+        let variant = Variant::new(&m1, &v1);
+        let mut builder = VariantBuilder::new();
+        builder.append_value(variant.clone());
+        let (metadata, value) = builder.finish();
+        assert_eq!(variant, Variant::new(&metadata, &value));
+    }
+
+    fn make_list() -> (Vec<u8>, Vec<u8>) {
+        let mut builder = VariantBuilder::new();
+        let mut list = builder.new_list();
+        list.append_value(1234);
+        list.append_value("a string value");
+        list.finish();
+        builder.finish()
     }
 
     #[test]
