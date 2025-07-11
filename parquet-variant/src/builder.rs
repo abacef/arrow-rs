@@ -15,9 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 use crate::decoder::{VariantBasicType, VariantPrimitiveType};
-use crate::{
-    PrimitiveCheck, ShortString, Variant, VariantDecimal16, VariantDecimal4, VariantDecimal8,
-};
+use crate::{ShortString, Variant, VariantDecimal16, VariantDecimal4, VariantDecimal8};
 use arrow_schema::ArrowError;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
@@ -699,7 +697,7 @@ impl VariantBuilder {
         ObjectBuilder::new(parent_state, validate_unique_fields)
     }
 
-    /// Append a non-nested value to the builder.
+    /// Append a value to the builder.
     ///
     /// # Example
     /// ```
@@ -708,30 +706,25 @@ impl VariantBuilder {
     /// // most primitive types can be appended directly as they implement `Into<Variant>`
     /// builder.append_value(42i8);
     /// ```
-    pub fn append_value<'m, 'd, T: Into<Variant<'m, 'd>> + PrimitiveCheck>(&mut self, value: T) {
-        let is_primitive = T::is_primitive();
-        if is_primitive {
-            self.buffer.append_non_nested_value(value);
-        } else {
-            let variant = value.into();
-            match variant {
-                Variant::Object(o) => {
-                    let mut no = self.new_object();
-                    for (key, val) in o.iter() {
-                        no.insert(key, val);
-                    }
-                    no.finish().unwrap()
+    pub fn append_value<'m, 'd, T: Into<Variant<'m, 'd>>>(&mut self, value: T) {
+        let variant = value.into();
+        match variant {
+            Variant::Object(o) => {
+                let mut no = self.new_object();
+                for (key, val) in o.iter() {
+                    no.insert(key, val);
                 }
-                Variant::List(l) => {
-                    let mut nl = self.new_list();
-                    for item in l.iter() {
-                        nl.append_value(item);
-                    }
-                    nl.finish()
+                no.finish().unwrap()
+            }
+            Variant::List(l) => {
+                let mut nl = self.new_list();
+                for item in l.iter() {
+                    nl.append_value(item);
                 }
-                _ => {
-                    self.buffer.append_non_nested_value(variant);
-                }
+                nl.finish()
+            }
+            _ => {
+                self.buffer.append_non_nested_value(variant);
             }
         }
     }
@@ -979,7 +972,7 @@ impl Drop for ObjectBuilder<'_> {
 /// Allows users to append values to a [`VariantBuilder`], [`ListBuilder`] or
 /// [`ObjectBuilder`]. using the same interface.
 pub trait VariantBuilderExt<'m, 'v> {
-    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>> + PrimitiveCheck);
+    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>>);
 
     fn new_list(&mut self) -> ListBuilder;
 
@@ -1001,7 +994,7 @@ impl<'m, 'v> VariantBuilderExt<'m, 'v> for ListBuilder<'_> {
 }
 
 impl<'m, 'v> VariantBuilderExt<'m, 'v> for VariantBuilder {
-    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>> + PrimitiveCheck) {
+    fn append_value(&mut self, value: impl Into<Variant<'m, 'v>>) {
         self.append_value(value);
     }
 
