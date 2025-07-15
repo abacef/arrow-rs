@@ -24,6 +24,8 @@ use std::marker::PhantomData;
 use crate::reader::tape::{Tape, TapeElement};
 use crate::reader::ArrayDecoder;
 
+use std::fmt::Write;
+
 const TRUE: &str = "true";
 const FALSE: &str = "false";
 
@@ -103,20 +105,24 @@ impl<O: OffsetSizeTrait> ArrayDecoder for StringArrayDecoder<O> {
                 TapeElement::I64(high) if coerce_primitive => match tape.get(p + 1) {
                     TapeElement::I32(low) => {
                         let val = ((high as i64) << 32) | (low as u32) as i64;
-                        builder.append_value(val.to_string());
+                        write!(builder, "{val}").unwrap();
+                        builder.append_value("");
                     }
                     _ => unreachable!(),
                 },
                 TapeElement::I32(n) if coerce_primitive => {
-                    builder.append_value(n.to_string());
+                    write!(builder, "{n}").unwrap();
+                    builder.append_value("");
                 }
                 TapeElement::F32(n) if coerce_primitive => {
-                    builder.append_value(n.to_string());
+                    write!(builder, "{n}").unwrap();
+                    builder.append_value("");
                 }
                 TapeElement::F64(high) if coerce_primitive => match tape.get(p + 1) {
                     TapeElement::F32(low) => {
                         let val = f64::from_bits(((high as u64) << 32) | low as u64);
-                        builder.append_value(val.to_string());
+                        write!(builder, "{val}").unwrap();
+                        builder.append_value("");
                     }
                     _ => unreachable!(),
                 },
