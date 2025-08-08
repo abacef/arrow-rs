@@ -18,8 +18,7 @@
 use crate::{VariantArray, VariantArrayBuilder};
 use arrow::array::{Array, AsArray};
 use arrow::datatypes::{
-    BinaryType, BinaryViewType, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type,
-    Int64Type, Int8Type, LargeBinaryType, UInt16Type, UInt32Type, UInt64Type, UInt8Type,
+    BinaryType, BinaryViewType, Date32Type, Date64Type, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, LargeBinaryType, UInt16Type, UInt32Type, UInt64Type, UInt8Type
 };
 use arrow_schema::{ArrowError, DataType};
 use half::f16;
@@ -86,6 +85,12 @@ pub fn cast_to_variant(input: &dyn Array) -> Result<VariantArray, ArrowError> {
     let input_type = input.data_type();
     // todo: handle other types like Boolean, Strings, Date, Timestamp, etc.
     match input_type {
+        DataType::Date64 => {
+            primitive_conversion!(Date64Type, input, builder);
+        }
+        DataType::Date32 => {
+            primitive_conversion!(Date32Type, input, builder);
+        }
         DataType::Binary => {
             cast_conversion!(BinaryType, as_bytes, |v| v, input, builder);
         }
@@ -151,12 +156,50 @@ pub fn cast_to_variant(input: &dyn Array) -> Result<VariantArray, ArrowError> {
 mod tests {
     use super::*;
     use arrow::array::{
-        ArrayRef, Float16Array, Float32Array, Float64Array, GenericByteBuilder,
-        GenericByteViewBuilder, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array,
-        UInt32Array, UInt64Array, UInt8Array,
+        ArrayRef, Date32Array, Date32Builder, Date64Array, Date64Builder, Float16Array, Float32Array, Float64Array, GenericByteBuilder, GenericByteViewBuilder, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array
     };
     use parquet_variant::{Variant, VariantDecimal16};
     use std::sync::Arc;
+
+    #[test]
+    fn test_cast_to_variant_date_64() {
+        let mut builder = Date64Builder::new();
+        
+        builder.append_value(1638316800000);
+        builder.append_null();
+        builder.append_value(1638403200000);
+
+        let array: Date64Array = builder.finish();
+
+        run_test(
+            Arc::new(array),
+            vec![
+                Some(Variant::Int64(1638316800000)),
+                None,
+                Some(Variant::Int64(1638403200000)),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_cast_to_variant_date_32() {
+        let mut builder = Date32Builder::new();
+        
+        builder.append_value(18993);
+        builder.append_null();
+        builder.append_value(18994);
+
+        let array: Date32Array = builder.finish();
+
+        run_test(
+            Arc::new(array),
+            vec![
+                Some(Variant::Int32(18993)),
+                None,
+                Some(Variant::Int32(18994)),
+            ],
+        );
+    }
 
     #[test]
     fn test_cast_to_variant_binary() {
