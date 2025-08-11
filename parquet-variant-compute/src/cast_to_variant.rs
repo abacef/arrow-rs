@@ -86,6 +86,19 @@ pub fn cast_to_variant(input: &dyn Array) -> Result<VariantArray, ArrowError> {
     let input_type = input.data_type();
     // todo: handle other types like Boolean, Strings, Date, Timestamp, etc.
     match input_type {
+        DataType::Interval(iu) => {
+            match iu {
+                arrow_schema::IntervalUnit::YearMonth => {
+                    
+                },
+                arrow_schema::IntervalUnit::DayTime => {
+                    
+                },
+                arrow_schema::IntervalUnit::MonthDayNano => {
+                    
+                },
+            }
+        }
         DataType::Binary => {
             cast_conversion!(BinaryType, as_bytes, |v| v, input, builder);
         }
@@ -150,13 +163,45 @@ pub fn cast_to_variant(input: &dyn Array) -> Result<VariantArray, ArrowError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::{
-        ArrayRef, Float16Array, Float32Array, Float64Array, GenericByteBuilder,
-        GenericByteViewBuilder, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array,
-        UInt32Array, UInt64Array, UInt8Array,
-    };
+    use arrow::{array::{
+        ArrayRef, Float16Array, Float32Array, Float64Array, GenericByteBuilder, GenericByteViewBuilder, Int16Array, Int32Array, Int64Array, Int8Array, IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array 
+    }, datatypes::{IntervalDayTime, IntervalMonthDayNano}};
     use parquet_variant::{Variant, VariantDecimal16};
     use std::sync::Arc;
+
+    #[test]
+    fn test_interval_to_variant() {
+        let year_month = IntervalYearMonthArray::from(vec![
+            2,
+            25,
+            -1,
+        ]);
+
+        let one = (2 as i32).to_le_bytes();
+        let two = (25 as i32).to_le_bytes();
+        let three= (-1 as i32).to_le_bytes();
+
+        run_test(
+            Arc::new(year_month),
+            vec![
+                Some(Variant::Binary(&one)),
+                Some(Variant::Binary(&two)),
+                Some(Variant::Binary(&three)),
+            ],
+        );
+
+        let day_time = IntervalDayTimeArray::from(vec![
+            IntervalDayTime::new(1, 1000),
+            IntervalDayTime::new(33, 0),
+            IntervalDayTime::new(0, 12 * 60 * 60 * 1000)
+        ]);
+
+        let month_day_nano = IntervalMonthDayNanoArray::from(vec![
+            IntervalMonthDayNano::new(1, 2, 1000),
+            IntervalMonthDayNano::new(12, 1, 0),
+            IntervalMonthDayNano::new(0, 0, 12 * 1000 * 1000)
+        ]);
+    }
 
     #[test]
     fn test_cast_to_variant_binary() {
