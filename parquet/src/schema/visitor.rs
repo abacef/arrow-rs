@@ -49,48 +49,41 @@ pub trait TypeVisitor<R, C> {
     /// type, and `element` as the `item_type`
     ///
     fn visit_list(&mut self, list_type: TypePtr, context: C) -> Result<R> {
-        match list_type.as_ref() {
-            Type::PrimitiveType { .. } => {
-                panic!("{list_type:?} is a list type and must be a group type")
-            }
-            Type::GroupType {
-                basic_info: _,
-                fields,
-            } if fields.len() == 1 => {
-                let list_item = fields.first().unwrap();
+        if list_type.get_fields().len() == 1 {
+            let list_item = list_type.get_fields().first().unwrap();
 
-                match list_item.as_ref() {
-                    Type::PrimitiveType { .. } => {
-                        if list_item.get_basic_info().repetition() == Repetition::REPEATED {
-                            self.visit_list_with_item(list_type.clone(), list_item.clone(), context)
-                        } else {
-                            Err(General(
-                                "Primitive element type of list must be repeated.".to_string(),
-                            ))
-                        }
+            match list_item.as_ref() {
+                Type::PrimitiveType { .. } => {
+                    if list_item.get_basic_info().repetition() == Repetition::REPEATED {
+                        self.visit_list_with_item(list_type.clone(), list_item.clone(), context)
+                    } else {
+                        Err(General(
+                            "Primitive element type of list must be repeated.".to_string(),
+                        ))
                     }
-                    Type::GroupType {
-                        basic_info: _,
-                        fields,
-                    } => {
-                        if fields.len() == 1
-                            && list_item.name() != "array"
-                            && list_item.name() != format!("{}_tuple", list_type.name())
-                        {
-                            self.visit_list_with_item(
-                                list_type.clone(),
-                                fields.first().unwrap().clone(),
-                                context,
-                            )
-                        } else {
-                            self.visit_list_with_item(list_type.clone(), list_item.clone(), context)
-                        }
+                }
+                Type::GroupType {
+                    basic_info: _,
+                    fields,
+                } => {
+                    if fields.len() == 1
+                        && list_item.name() != "array"
+                        && list_item.name() != format!("{}_tuple", list_type.name())
+                    {
+                        self.visit_list_with_item(
+                            list_type.clone(),
+                            fields.first().unwrap().clone(),
+                            context,
+                        )
+                    } else {
+                        self.visit_list_with_item(list_type.clone(), list_item.clone(), context)
                     }
                 }
             }
-            _ => Err(General(
+        } else {
+            Err(General(
                 "Group element type of list can only contain one field.".to_string(),
-            )),
+            ))
         }
     }
 
@@ -102,16 +95,15 @@ pub trait TypeVisitor<R, C> {
 
     /// A utility method which detects input type and calls corresponding method.
     fn dispatch(&mut self, cur_type: TypePtr, context: C) -> Result<R> {
-        if cur_type.is_primitive() {
-            self.visit_primitive(cur_type, context)
-        } else {
-            match cur_type.get_basic_info().converted_type() {
+        match cur_type.as_ref() {
+            Type::PrimitiveType { .. } => self.visit_primitive(cur_type, context),
+            Type::GroupType { .. } => match cur_type.get_basic_info().converted_type() {
                 ConvertedType::LIST => self.visit_list(cur_type, context),
                 ConvertedType::MAP | ConvertedType::MAP_KEY_VALUE => {
                     self.visit_map(cur_type, context)
                 }
                 _ => self.visit_struct(cur_type, context),
-            }
+            },
         }
     }
 
